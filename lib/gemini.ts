@@ -1,4 +1,4 @@
-export const GEMINI_MODEL = 'gemini-1.5-flash';
+export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 export async function askGemini(prompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -13,19 +13,34 @@ export async function askGemini(prompt: string): Promise<string> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
       }),
     },
   );
 
   if (!response.ok) {
-    throw new Error(`Gemini API request failed with status ${response.status}.`);
+    const errorBody = await response.text();
+    console.error('Gemini API error:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: errorBody,
+    });
+
+    throw new Error('Gemini API request failed. Please check the server logs.');
   }
 
   const data = (await response.json()) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
   };
-  const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('').trim();
+
+  const text = data.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text ?? '')
+    .join('')
+    .trim();
 
   if (!text) {
     throw new Error('Gemini API returned an empty response.');
