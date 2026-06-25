@@ -57,6 +57,8 @@ The workflow is intentionally simple and transparent so it is easy to understand
 
 ## Evaluation notes
 
+The app calls Gemini first. If Gemini is temporarily unavailable due to high demand, the app uses a deterministic fallback mode so the Kaggle demo remains reliable.
+
 The Evaluation Agent scores the generated plan from **1 to 10** based on practicality, alignment with the user's main goal, respect for meetings and working hours, inclusion of breaks, and safety considerations.
 
 The output is intended for productivity planning support only. Users should review and adjust the plan based on real-world constraints, personal needs, and any urgent responsibilities.
