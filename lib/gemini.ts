@@ -35,11 +35,18 @@ function createLocalFallbackResponse(prompt: string): string {
         'Use a real lunch break away from the screen when possible.',
         'Reserve a short end-of-day reset before stopping work.',
       ],
+      risks: [
+        'This fallback plan is generic because Gemini was temporarily unavailable.',
+        'Watch for overloading the afternoon with too many tasks after meetings.',
+        'Manually adjust times around any fixed meetings you entered.',
+      ],
       risksOrWarnings: [
         'This fallback plan is generic because Gemini was temporarily unavailable.',
         'Watch for overloading the afternoon with too many tasks after meetings.',
         'Manually adjust times around any fixed meetings you entered.',
       ],
+      safetyCheck:
+        'Local fallback safety check: the plan includes breaks, avoids all-day focus blocks, and recommends deferring optional work if overloaded.',
       safetyCheckResult:
         'Local fallback safety check: the plan includes breaks, avoids all-day focus blocks, and recommends deferring optional work if overloaded.',
       evaluationScore: 7,

@@ -1,13 +1,86 @@
 import { askGemini } from '@/lib/gemini';
 import type { AgentContext, DailyPlan } from './types';
 
-function extractJson(text: string): string {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced?.[1]) return fenced[1].trim();
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start !== -1 && end !== -1 && end > start) return text.slice(start, end + 1);
-  return text;
+const NON_JSON_FALLBACK_NOTE =
+  'Gemini returned a non-JSON formatted response, so this structured result was generated using local demo fallback mode.';
+
+function cleanGeminiJsonOutput(text: string): string {
+  return text.replace(/```json/gi, '').replace(/```/g, '').trim();
+}
+
+function getStringArray(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value)) return fallback;
+  const strings = value.map((item) => String(item).trim()).filter(Boolean);
+  return strings.length > 0 ? strings : fallback;
+}
+
+function getEvaluationScore(value: unknown): number {
+  return Math.max(1, Math.min(10, Number(value) || 1));
+}
+
+function createNonJsonFallbackPlan(): DailyPlan {
+  return {
+    dailyPlan: [
+      NON_JSON_FALLBACK_NOTE,
+      'Review your main goal and identify the single most important outcome for today.',
+      'Protect fixed meetings and schedule focused work around them.',
+      'Use short planning checkpoints to adjust scope if the day becomes overloaded.',
+    ],
+    prioritizedTasks: [
+      'Work on the main goal first.',
+      'Complete time-sensitive tasks second.',
+      'Defer optional or low-impact tasks if needed.',
+    ],
+    suggestedBreaks: [
+      'Take a 10-15 minute break after each long focus block.',
+      'Reserve time for lunch or a true midpoint reset.',
+      'End with a short review and shutdown routine.',
+    ],
+    risks: [
+      'The original Gemini response was not parseable as JSON.',
+      'This local fallback is generic and should be adjusted to your exact meetings and tasks.',
+      'Avoid packing every open task into one day if energy is low.',
+    ],
+    risksOrWarnings: [
+      'The original Gemini response was not parseable as JSON.',
+      'This local fallback is generic and should be adjusted to your exact meetings and tasks.',
+      'Avoid packing every open task into one day if energy is low.',
+    ],
+    safetyCheck: 'Local fallback safety check: includes breaks, scope control, and overload warnings.',
+    safetyCheckResult: 'Local fallback safety check: includes breaks, scope control, and overload warnings.',
+    evaluationScore: 6,
+    agentCollaboration: [
+      'Evaluation Agent detected non-JSON Gemini output and switched to local structured fallback mode.',
+      'Coordinator Agent fallback preserved the required demo sections.',
+      'Safety Guardrail fallback added break and overload guidance.',
+    ],
+  };
+}
+
+function parseDailyPlan(response: string): DailyPlan {
+  try {
+    const parsed = JSON.parse(cleanGeminiJsonOutput(response)) as Partial<DailyPlan>;
+    const risks = getStringArray(parsed.risks ?? parsed.risksOrWarnings, []);
+    const safetyCheck = String(parsed.safetyCheck ?? parsed.safetyCheckResult ?? 'Safety review completed.');
+
+    return {
+      dailyPlan: getStringArray(parsed.dailyPlan, []),
+      prioritizedTasks: getStringArray(parsed.prioritizedTasks, []),
+      suggestedBreaks: getStringArray(parsed.suggestedBreaks, []),
+      risks,
+      risksOrWarnings: risks,
+      safetyCheck,
+      safetyCheckResult: safetyCheck,
+      evaluationScore: getEvaluationScore(parsed.evaluationScore),
+      agentCollaboration: getStringArray(parsed.agentCollaboration, []),
+    };
+  } catch (error) {
+    console.error('Failed to parse Gemini evaluation JSON.', {
+      error,
+      cleanedResponse: cleanGeminiJsonOutput(response),
+    });
+    return createNonJsonFallbackPlan();
+  }
 }
 
 export async function runEvaluationAgent(context: AgentContext): Promise<DailyPlan> {
@@ -17,8 +90,8 @@ Evaluate the daily plan and return ONLY valid JSON matching this TypeScript type
   "dailyPlan": string[],
   "prioritizedTasks": string[],
   "suggestedBreaks": string[],
-  "risksOrWarnings": string[],
-  "safetyCheckResult": string,
+  "risks": string[],
+  "safetyCheck": string,
   "evaluationScore": number,
   "agentCollaboration": string[]
 }
@@ -38,15 +111,5 @@ ${context.safety}
 
 User main goal: ${context.input.mainGoal}`);
 
-  const parsed = JSON.parse(extractJson(response)) as DailyPlan;
-
-  return {
-    dailyPlan: Array.isArray(parsed.dailyPlan) ? parsed.dailyPlan : [],
-    prioritizedTasks: Array.isArray(parsed.prioritizedTasks) ? parsed.prioritizedTasks : [],
-    suggestedBreaks: Array.isArray(parsed.suggestedBreaks) ? parsed.suggestedBreaks : [],
-    risksOrWarnings: Array.isArray(parsed.risksOrWarnings) ? parsed.risksOrWarnings : [],
-    safetyCheckResult: String(parsed.safetyCheckResult ?? 'Safety review completed.'),
-    evaluationScore: Math.max(1, Math.min(10, Number(parsed.evaluationScore) || 1)),
-    agentCollaboration: Array.isArray(parsed.agentCollaboration) ? parsed.agentCollaboration : [],
-  };
+  return parseDailyPlan(response);
 }

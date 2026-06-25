@@ -19,7 +19,9 @@ export type DailyPlan = {
   dailyPlan: string[];
   prioritizedTasks: string[];
   suggestedBreaks: string[];
+  risks: string[];
   risksOrWarnings: string[];
+  safetyCheck: string;
   safetyCheckResult: string;
   evaluationScore: number;
   agentCollaboration: string[];
